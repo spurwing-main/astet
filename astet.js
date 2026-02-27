@@ -1,30 +1,37 @@
 function main() {
 	function homeCarousel() {
+		// get section and list
 		const section = document.querySelector(".c-home-carousel");
 		if (!section) return;
-
 		const listEl = section.querySelector(".home-carousel_list");
 		if (!listEl) return;
 
 		// add a "loading" class immediately
 		document.documentElement.classList.add("home-carousel-loading");
 
-		// Wait for <img> tags inside the carousel
-		imagesLoaded(
-			listEl,
-			{
-				background: false, // also check CSS background images
-			},
-			function () {
-				// All images loaded (or broken) -> safe to initialize slider now
-				initKeen();
-			},
-		);
+		let started = false;
+
+		function startCarousel() {
+			if (started) return;
+			started = true;
+
+			initKeen();
+		}
+
+		// fallback if imagesLoaded doesnt exist
+		if (!astet.hasImagesLoaded) {
+			startCarousel();
+		} else {
+			const imgLoad = imagesLoaded(listEl, { background: true });
+			imgLoad.on("always", () => startCarousel());
+			setTimeout(() => startCarousel(), 2500); // timeout fallback if image load takes too long
+		}
 
 		function initKeen() {
 			const DURATION = 1;
 			const DURATION_MS = DURATION * 1000;
 			const power3InOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+			const opacityScalingFactor = 1.1;
 
 			const slider = new KeenSlider(
 				listEl,
@@ -41,7 +48,10 @@ function main() {
 						s.slides.forEach((slide, idx) => {
 							const overlay = slide.querySelector(".home-carousel_slide-overlay");
 							if (overlay) {
-								overlay.style.opacity = 1 - s.track.details.slides[idx].portion;
+								overlay.style.opacity = Math.min(
+									1,
+									opacityScalingFactor * (1 - s.track.details.slides[idx].portion),
+								);
 							}
 						});
 					},
@@ -89,6 +99,6 @@ function main() {
 			});
 		}
 	}
-
+	astet.hasImagesLoaded = typeof window.imagesLoaded === "function";
 	homeCarousel();
 }
