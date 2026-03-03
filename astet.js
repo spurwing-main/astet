@@ -373,6 +373,62 @@ function main() {
 				},
 			});
 		});
+
+		// batch
+		ScrollTrigger.batch(".anim-load-batch-trigger :is(.c-card, .anim-load-item)", {
+			onEnter: (batch) =>
+				gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.5, ease: "sine.inOut", stagger: 0.15 }),
+			start: "top 95%",
+		});
+
+		// click events on any filter controls will immediately set autoAlpha and y to 1 and 0 respectively, to ensure they are visible if user filters before scroll
+		// filter controls are .checkbox_label
+		const filterControls = document.querySelectorAll(".checkbox_label");
+		filterControls.forEach((control) => {
+			control.addEventListener("click", () => {
+				const cards = document.querySelectorAll(".c-card, .anim-load-item");
+				gsap.set(cards, { autoAlpha: 1, y: 0 });
+			});
+		});
+
+		/* add .project-list-loaded class to html when a filter control is clicked for the first time (otherwise FS render events fire twice on page load causing flashing) */
+		let projectListLoaded = false;
+		filterControls.forEach((control) => {
+			control.addEventListener("click", () => {
+				if (!projectListLoaded) {
+					document.documentElement.classList.add("project-list-loaded");
+					projectListLoaded = true;
+				}
+			});
+		});
+	}
+
+	/* TO DO - check if we still need this scroll trigger refresh now that we are using filter control clicks to set all cards visible		 */
+	function finsweetScrollTriggerRefresh() {
+		if (window._astetFsScrollTriggerRefreshHooked) return;
+		window._astetFsScrollTriggerRefreshHooked = true;
+
+		const refreshSoon = () => {
+			console.log("Finsweet list rendered/updated, refreshing ScrollTrigger...");
+			if (typeof window.ScrollTrigger === "undefined") return;
+			if (typeof ScrollTrigger.refresh !== "function") return;
+			// Defer to ensure DOM/layout has settled after Finsweet renders.
+			requestAnimationFrame(() => setTimeout(() => ScrollTrigger.refresh(), 0));
+		};
+
+		window.FinsweetAttributes ||= [];
+		window.FinsweetAttributes.push([
+			"list",
+			(listInstances) => {
+				(listInstances || []).forEach((listInstance) => {
+					if (!listInstance || typeof listInstance.addHook !== "function") return;
+					listInstance.addHook("afterRender", () => refreshSoon());
+				});
+
+				// Run once on init, too.
+				refreshSoon();
+			},
+		]);
 	}
 
 	astet.hasImagesLoaded = typeof window.imagesLoaded === "function";
@@ -380,4 +436,5 @@ function main() {
 	homeCarousel();
 	mediaCardHover();
 	loadCardsOnScroll();
+	finsweetScrollTriggerRefresh();
 }
