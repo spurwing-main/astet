@@ -431,7 +431,7 @@ function main() {
 		]);
 	}
 
-	function navOpenClose() {
+	function nav_openClose() {
 		const MOBILE_PORTRAIT_QUERY = "(max-width: 479px)";
 
 		const navBtn = document.querySelector(".nav_mobile-btn");
@@ -544,11 +544,140 @@ function main() {
 		};
 	}
 
+	// ...existing code...
+	function nav_hideShow() {
+		const nav = document.querySelector(".nav");
+		if (!nav) return;
+
+		// --- DEBUG LOGGING (enable with localStorage.setItem("astet:debugNav","1")) ---
+		const DEBUG_NAV = (() => {
+			try {
+				return localStorage.getItem("astet:debugNav") === "1";
+			} catch {
+				return false;
+			}
+		})();
+		const log = (...args) => {
+			if (!DEBUG_NAV) return;
+			console.log("[nav_hideShow]", ...args);
+		};
+
+		const showThreshold = 10; // Always show when within this distance from top
+		const hideThreshold = 5; // Can hide only after passing this
+		const revealBuffer = 5; // Scroll-up distance before revealing
+		const hideBuffer = 2; // Small buffer to prevent flicker
+
+		let lastScrollY = window.scrollY;
+		let currentScrollY = window.scrollY;
+		let revealDistance = 0;
+		let navHidden = false;
+		let ticking = false;
+
+		// Track changes to reduce noisy logs
+		let lastLog = {
+			navHidden,
+			isPast: currentScrollY > hideThreshold,
+			y: currentScrollY,
+		};
+
+		log("init", {
+			showThreshold,
+			hideThreshold,
+			revealBuffer,
+			hideBuffer,
+			startY: currentScrollY,
+		});
+
+		// Clean up any existing trigger
+		const oldTrigger = ScrollTrigger.getById("nav_hideShow");
+		if (oldTrigger) {
+			log("killing old ScrollTrigger#nav_hideShow");
+			oldTrigger.kill();
+		}
+
+		// rAF update loop
+		function updateNav() {
+			ticking = false;
+
+			const y = currentScrollY;
+			const delta = y - lastScrollY;
+			const isPast = y > hideThreshold;
+
+			// Helpful “why didn’t it hide?” log (only when scrolling down past threshold)
+			if (DEBUG_NAV && delta > 0 && isPast && !navHidden && delta <= hideBuffer) {
+				log("not hiding (delta too small)", { y, lastScrollY, delta, hideBuffer });
+			}
+
+			// --- NAV VISIBILITY ---
+			if (y <= showThreshold) {
+				if (navHidden) {
+					log("show (near top)", { y, showThreshold });
+					nav.classList.remove("is-hidden", "is-past-threshold");
+					navHidden = false;
+				}
+				revealDistance = 0;
+			} else if (delta > hideBuffer && y > hideThreshold && !navHidden) {
+				log("hide (scrolling down)", { y, lastScrollY, delta, hideBuffer });
+				nav.classList.add("is-hidden", "is-past-threshold");
+				navHidden = true;
+				revealDistance = 0;
+			} else if (delta < 0 && navHidden) {
+				revealDistance -= delta; // delta is negative
+				if (DEBUG_NAV) log("scrolling up while hidden", { y, delta, revealDistance, revealBuffer });
+				if (revealDistance >= revealBuffer) {
+					log("reveal (scrolled up enough)", { y, revealDistance, revealBuffer });
+					nav.classList.remove("is-hidden");
+					navHidden = false;
+					revealDistance = 0;
+				}
+			}
+
+			nav.classList.toggle("is-past-threshold", isPast);
+
+			// Log state transitions (kept minimal)
+			if (DEBUG_NAV) {
+				const stateChanged =
+					lastLog.navHidden !== navHidden ||
+					lastLog.isPast !== isPast ||
+					Math.abs(lastLog.y - y) >= 50;
+				if (stateChanged) {
+					log("state", { y, lastScrollY, delta, navHidden, isPast, revealDistance });
+					lastLog = { navHidden, isPast, y };
+				}
+			}
+
+			lastScrollY = y;
+		}
+
+		// ScrollTrigger watches scroll and schedules an update
+		ScrollTrigger.create({
+			id: "nav_hideShow",
+			trigger: document.body,
+			start: "top top",
+			end: "bottom bottom",
+			onUpdate(self) {
+				currentScrollY = window.scrollY;
+
+				if (DEBUG_NAV && self?.direction) {
+					// direction: 1 down, -1 up
+					log("onUpdate", { y: currentScrollY, direction: self.direction });
+				}
+
+				if (!ticking) {
+					ticking = true;
+					requestAnimationFrame(updateNav);
+				}
+			},
+		});
+	}
+	// ...existing code...
+
 	astet.hasImagesLoaded = typeof window.imagesLoaded === "function";
 	clickToCopy();
 	homeCarousel();
 	mediaCardHover();
 	loadCardsOnScroll();
 	finsweetScrollTriggerRefresh();
-	navOpenClose();
+	nav_openClose();
+	nav_hideShow();
 }
