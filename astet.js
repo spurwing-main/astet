@@ -544,10 +544,11 @@ function main() {
 		};
 	}
 
-	// ...existing code...
 	function nav_hideShow() {
 		const nav = document.querySelector(".nav");
 		if (!nav) return;
+		if (typeof window.ScrollTrigger === "undefined" || typeof ScrollTrigger.create !== "function")
+			return;
 
 		// --- DEBUG LOGGING (enable with localStorage.setItem("astet:debugNav","1")) ---
 		const DEBUG_NAV = (() => {
@@ -563,9 +564,9 @@ function main() {
 		};
 
 		const showThreshold = 10; // Always show when within this distance from top
-		const hideThreshold = 5; // Can hide only after passing this
-		const revealBuffer = 5; // Scroll-up distance before revealing
-		const hideBuffer = 2; // Small buffer to prevent flicker
+		const hideThreshold = 60; // Can hide only after passing this
+		const revealBuffer = 10; // Scroll-up distance before revealing
+		const hideBuffer = 10; // Small buffer to prevent flicker
 
 		let lastScrollY = window.scrollY;
 		let currentScrollY = window.scrollY;
@@ -573,10 +574,36 @@ function main() {
 		let navHidden = false;
 		let ticking = false;
 
+		const isInPageVariant = nav.matches('[data-wf--nav--variant="in-page"]');
+		let hideEnabled = !isInPageVariant;
+		let armStartY = 0; // for in-page variant: scrollY where hide/show becomes active
+
+		function setHideEnabled(enabled, reason) {
+			const next = Boolean(enabled);
+			if (hideEnabled === next) return;
+			hideEnabled = next;
+			nav.classList.toggle("is-hide-enabled", hideEnabled);
+			log("hideEnabled", { hideEnabled, reason });
+
+			if (!hideEnabled) armStartY = 0;
+
+			// Reset scroll deltas so we don't immediately hide on the first armed frame.
+			lastScrollY = window.scrollY;
+			currentScrollY = window.scrollY;
+			revealDistance = 0;
+
+			if (!hideEnabled) {
+				nav.classList.remove("is-hidden", "is-past-threshold");
+				navHidden = false;
+			}
+		}
+
 		// Track changes to reduce noisy logs
 		let lastLog = {
 			navHidden,
-			isPast: currentScrollY > hideThreshold,
+			isPast:
+				hideEnabled &&
+				(isInPageVariant ? currentScrollY - armStartY : currentScrollY) > hideThreshold,
 			y: currentScrollY,
 		};
 
@@ -586,6 +613,7 @@ function main() {
 			revealBuffer,
 			hideBuffer,
 			startY: currentScrollY,
+			isInPageVariant,
 		});
 
 		// Clean up any existing trigger
@@ -595,13 +623,89 @@ function main() {
 			oldTrigger.kill();
 		}
 
+		const oldArmTrigger = ScrollTrigger.getById("nav_hideShow_arm");
+		if (oldArmTrigger) {
+			log("killing old ScrollTrigger#nav_hideShow_arm");
+			oldArmTrigger.kill();
+		}
+
+		// For the "in-page" sticky nav variant, only start hide/show once the hero has
+		// scrolled past the top of the viewport.
+		if (isInPageVariant) {
+			const candidateSelectors = [".c-home-carousel"];
+
+			let heroEl = null;
+			for (const sel of candidateSelectors) {
+				try {
+					const found = document.querySelector(sel);
+					if (found) {
+						heroEl = found;
+						log("hero found", { selector: sel, heroEl });
+						break;
+					}
+				} catch (e) {
+					log("invalid hero selector", { selector: sel, error: String(e) });
+				}
+			}
+
+			if (heroEl) {
+				setHideEnabled(false, "init-in-page");
+				ScrollTrigger.create({
+					id: "nav_hideShow_arm",
+					trigger: heroEl,
+					start: "bottom top",
+					end: "bottom top",
+					onEnter(self) {
+						armStartY = self?.start ?? window.scrollY;
+						setHideEnabled(true, "hero-passed");
+					},
+					onLeaveBack: () => setHideEnabled(false, "hero-visible"),
+					onRefresh(self) {
+						// Ensure correct state after layout shifts / late-loading media.
+						const y = window.scrollY;
+						const armed = y >= self.start;
+						if (armed) {
+							armStartY = self.start;
+							// Keep deltas stable if baseline shifts.
+							lastScrollY = y;
+							currentScrollY = y;
+							revealDistance = 0;
+						}
+						setHideEnabled(armed, "refresh");
+					},
+				});
+			} else {
+				// Fail safe: if we can't find the hero, keep hide/show disabled for this variant.
+				setHideEnabled(false, "no-hero");
+				log("in-page variant: .c-home-carousel not found; hide/show will remain disabled", {
+					candidateSelectors,
+				});
+			}
+		} else {
+			// Ensure class isn't left behind if markup changes.
+			nav.classList.remove("is-hide-enabled");
+		}
+
 		// rAF update loop
 		function updateNav() {
 			ticking = false;
 
-			const y = currentScrollY;
-			const delta = y - lastScrollY;
-			const isPast = y > hideThreshold;
+			const yRaw = currentScrollY;
+			const delta = yRaw - lastScrollY;
+			const y = isInPageVariant ? yRaw - armStartY : yRaw;
+			const isPast = hideEnabled && y > hideThreshold;
+
+			if (!hideEnabled) {
+				// While the hero is still on-screen (in-page variant), keep nav in its static/sticky state.
+				if (navHidden) {
+					log("forced show (hide disabled)", { y });
+					nav.classList.remove("is-hidden", "is-past-threshold");
+					navHidden = false;
+				}
+				revealDistance = 0;
+				lastScrollY = yRaw;
+				return;
+			}
 
 			// Helpful “why didn’t it hide?” log (only when scrolling down past threshold)
 			if (DEBUG_NAV && delta > 0 && isPast && !navHidden && delta <= hideBuffer) {
@@ -646,15 +750,15 @@ function main() {
 				}
 			}
 
-			lastScrollY = y;
+			lastScrollY = yRaw;
 		}
 
 		// ScrollTrigger watches scroll and schedules an update
 		ScrollTrigger.create({
 			id: "nav_hideShow",
-			trigger: document.body,
-			start: "top top",
-			end: "bottom bottom",
+			start: 0,
+			end: () => ScrollTrigger.maxScroll(window),
+			invalidateOnRefresh: true,
 			onUpdate(self) {
 				currentScrollY = window.scrollY;
 
@@ -670,7 +774,6 @@ function main() {
 			},
 		});
 	}
-	// ...existing code...
 
 	astet.hasImagesLoaded = typeof window.imagesLoaded === "function";
 	clickToCopy();
