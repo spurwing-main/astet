@@ -391,13 +391,13 @@ function main() {
 			});
 		});
 
-		/* add .project-list-loaded class to html when a filter control is clicked for the first time (otherwise FS render events fire twice on page load causing flashing) */
-		let projectListLoaded = false;
+		/* add .filter-list-loaded class to html when a filter control is clicked for the first time (otherwise FS render events fire twice on page load causing flashing) */
+		let filterListLoaded = false;
 		filterControls.forEach((control) => {
 			control.addEventListener("click", () => {
-				if (!projectListLoaded) {
-					document.documentElement.classList.add("project-list-loaded");
-					projectListLoaded = true;
+				if (!filterListLoaded) {
+					document.documentElement.classList.add("filter-list-loaded");
+					filterListLoaded = true;
 				}
 			});
 		});
