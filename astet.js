@@ -209,6 +209,23 @@ function main() {
 		// add a "loading" class immediately
 		document.documentElement.classList.add("home-carousel-loading");
 
+		let didSetReadyClasses = false;
+		function setCarouselReady(reason) {
+			if (didSetReadyClasses) return;
+			didSetReadyClasses = true;
+			document.documentElement.classList.remove("home-carousel-loading");
+			document.documentElement.classList.add("home-carousel-loaded");
+			if (reason) console.log("homeCarousel ready:", reason);
+		}
+
+		// If there are no slides, Keen's `created` callback may never fire.
+		// Fail open: toggle classes so the page doesn't stay in a loading state.
+		const slideCount = listEl.querySelectorAll(".home-carousel_slide").length;
+		if (!slideCount) {
+			setCarouselReady("no-slides");
+			return;
+		}
+
 		let started = false;
 
 		function startCarousel() {
@@ -233,41 +250,55 @@ function main() {
 			const power3InOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 			const opacityScalingFactor = 1.1;
 
-			const slider = new KeenSlider(
-				listEl,
-				{
-					loop: true,
-					selector: ".home-carousel_slide",
-					defaultAnimation: {
-						duration: DURATION_MS,
-						easing: power3InOut,
-					},
-					drag: true,
-					dragSpeed: 0.75,
-					detailsChanged: (s) => {
-						s.slides.forEach((slide, idx) => {
-							const overlay = slide.querySelector(".home-carousel_slide-overlay");
-							if (overlay) {
-								overlay.style.opacity = Math.min(
-									1,
-									opacityScalingFactor * (1 - s.track.details.slides[idx].portion),
-								);
-							}
-						});
-					},
-					created: (s) => {
-						initControls(s);
-						updateName(s); // set initial name
-						document.documentElement.classList.remove("home-carousel-loading");
-						document.documentElement.classList.add("home-carousel-loaded");
-					},
+			if (typeof window.KeenSlider === "undefined") {
+				setCarouselReady("keen-missing");
+				return;
+			}
 
-					slideChanged: (s) => {
-						updateName(s); // update after next/prev (and drag) actually changes slide
+			let slider;
+			try {
+				slider = new KeenSlider(
+					listEl,
+					{
+						loop: true,
+						selector: ".home-carousel_slide",
+						defaultAnimation: {
+							duration: DURATION_MS,
+							easing: power3InOut,
+						},
+						drag: true,
+						dragSpeed: 0.75,
+						detailsChanged: (s) => {
+							s.slides.forEach((slide, idx) => {
+								const overlay = slide.querySelector(".home-carousel_slide-overlay");
+								if (overlay) {
+									overlay.style.opacity = Math.min(
+										1,
+										opacityScalingFactor * (1 - s.track.details.slides[idx].portion),
+									);
+								}
+							});
+						},
+						created: (s) => {
+							initControls(s);
+							updateName(s); // set initial name
+							setCarouselReady("keen-created");
+						},
+
+						slideChanged: (s) => {
+							updateName(s); // update after next/prev (and drag) actually changes slide
+						},
 					},
-				},
-				[],
-			);
+					[],
+				);
+			} catch (e) {
+				console.warn("homeCarousel: KeenSlider init failed", e);
+				setCarouselReady("keen-init-failed");
+				return;
+			}
+
+			// Safety net: if Keen never calls `created`, don't keep the page "loading".
+			setTimeout(() => setCarouselReady("created-timeout"), 1000);
 
 			astet.slider = slider;
 		}
@@ -298,57 +329,6 @@ function main() {
 				text: { value: newName, delimiter: "", speed: 2.5 },
 			});
 		}
-	}
-
-	function mediaCardHover() {
-		return; // replaced with CSS only hover effect for now.
-		const mm = gsap.matchMedia();
-
-		// Require real hover + fine pointer (typical desktop/laptop trackpad/mouse)
-		mm.add("(min-width: 480px) and (hover: hover) and (pointer: fine)", () => {
-			const cards = Array.from(document.querySelectorAll(".c-card"));
-			const cleanups = [];
-
-			cards.forEach((card) => {
-				const caption_anim = card.querySelectorAll(".anim-caption-item");
-				if (!caption_anim.length) return;
-
-				const onEnter = () => {
-					gsap.to(caption_anim, {
-						autoAlpha: 1,
-						y: 0,
-						duration: 0.25,
-						ease: "sine.inOut",
-						stagger: 0.05,
-					});
-				};
-
-				const onLeave = () => {
-					gsap.to(caption_anim, {
-						autoAlpha: 0,
-						y: -5,
-						duration: 0.2,
-						ease: "sine.inOut",
-						stagger: 0.05,
-					});
-				};
-
-				card.addEventListener("mouseenter", onEnter);
-				card.addEventListener("mouseleave", onLeave);
-
-				cleanups.push(() => {
-					card.removeEventListener("mouseenter", onEnter);
-					card.removeEventListener("mouseleave", onLeave);
-				});
-			});
-
-			// GSAP MatchMedia cleanup when query no longer matches
-			return () => {
-				cleanups.forEach((fn) => fn());
-				// clear autoalpha and y
-				gsap.set(".anim-caption-item", { clearProps: "all" });
-			};
-		});
 	}
 
 	function loadCardsOnScroll() {
