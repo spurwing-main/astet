@@ -758,7 +758,6 @@ function main() {
 	astet.hasImagesLoaded = typeof window.imagesLoaded === "function";
 	clickToCopy();
 	homeCarousel();
-	mediaCardHover();
 	loadCardsOnScroll();
 	finsweetScrollTriggerRefresh();
 	nav_openClose();
