@@ -383,7 +383,6 @@ function main() {
 		});
 	}
 
-	/* TO DO - check if we still need this scroll trigger refresh now that we are using filter control clicks to set all cards visible		 */
 	function finsweetScrollTriggerRefresh() {
 		if (window._astetFsScrollTriggerRefreshHooked) return;
 		window._astetFsScrollTriggerRefreshHooked = true;
@@ -414,8 +413,8 @@ function main() {
 	function nav_openClose() {
 		const MOBILE_PORTRAIT_QUERY = "(max-width: 479px)";
 
-		const navBtn = document.querySelector(".nav_mobile-btn");
-		if (!navBtn) return;
+		const navBtns = gsap.utils.toArray(".nav_mobile-btn");
+		if (!navBtns.length) return;
 		if (typeof window.gsap === "undefined") return;
 
 		const mql =
@@ -427,8 +426,11 @@ function main() {
 		function setup() {
 			if (cleanup) return;
 
-			const navEl = document.querySelector(".nav");
+			const navEl = document.querySelector(".nav:not(.is-home-bar)");
 			if (!navEl) return;
+
+			const homeFakeNav = document.querySelector(".nav.is-home-bar"); // this is the logo and button shown on the home page in an open state
+			const isHomePage = Boolean(homeFakeNav);
 
 			const menuWrap = navEl.querySelector(".nav_menu-outer-wrap");
 			const menuBg = navEl.querySelector(".nav_menu-bg");
@@ -441,7 +443,7 @@ function main() {
 			open = false;
 			astet.navOpen = false;
 			document.documentElement.classList.remove("nav-open");
-			navBtn.setAttribute("aria-expanded", "false");
+			navBtns.forEach((navBtn) => navBtn.setAttribute("aria-expanded", "false"));
 			menuWrap.style.display = "none";
 
 			gsap.set([menuBg, menuInner], { autoAlpha: 0 });
@@ -454,7 +456,13 @@ function main() {
 			});
 
 			// Base fade-in
-			tl.to([menuBg, menuInner], { autoAlpha: 1, duration: 0.25, ease: "sine.inOut" }, 0);
+			tl.to(homeFakeNav, { display: "flex" }, 0);
+
+			tl.to(
+				[menuBg, menuInner, homeFakeNav],
+				{ autoAlpha: 1, duration: 0.25, ease: "sine.inOut" },
+				0,
+			);
 
 			// Link stagger + socials fade
 			if (menuLinks.length) tl.to(menuLinks, { autoAlpha: 1, duration: 0.25, stagger: 0.03 }, 0.2);
@@ -465,11 +473,10 @@ function main() {
 			});
 
 			const onClick = () => {
-				console.log("Nav button clicked. Current open state:", open);
 				open = !open;
 				astet.navOpen = open;
 				document.documentElement.classList.toggle("nav-open", open);
-				navBtn.setAttribute("aria-expanded", String(open));
+				navBtns.forEach((navBtn) => navBtn.setAttribute("aria-expanded", String(open)));
 
 				if (open) {
 					menuWrap.style.display = "flex";
@@ -479,20 +486,19 @@ function main() {
 				}
 			};
 
-			navBtn.addEventListener("click", onClick);
+			navBtns.forEach((navBtn) => navBtn.addEventListener("click", onClick));
 
 			cleanup = () => {
-				navBtn.removeEventListener("click", onClick);
+				navBtns.forEach((navBtn) => navBtn.removeEventListener("click", onClick));
 				open = false;
 				astet.navOpen = false;
 				document.documentElement.classList.remove("nav-open");
-				navBtn.setAttribute("aria-expanded", "false");
+				navBtns.forEach((navBtn) => navBtn.setAttribute("aria-expanded", "false"));
 				menuWrap.style.display = "";
 				tl.kill();
 				gsap.set([menuBg, menuInner], { clearProps: "all" });
 				if (menuLinks.length) gsap.set(menuLinks, { clearProps: "all" });
 				if (socials) gsap.set(socials, { clearProps: "all" });
-				// gsap.set([svgLine1, svgLine2, svgLine3], { clearProps: "all" });
 			};
 		}
 
@@ -503,8 +509,11 @@ function main() {
 		}
 
 		function syncToBreakpoint() {
-			if (!mql || mql.matches) setup();
-			else teardown();
+			if (!mql || mql.matches) {
+				setup();
+			} else {
+				teardown();
+			}
 		}
 
 		syncToBreakpoint();
