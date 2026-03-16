@@ -548,6 +548,7 @@ function main() {
 			}
 		})();
 		const log = (...args) => {
+			return; // disable all nav_hideShow logs (keep the function and calls in place for easy re-enabling when needed)
 			if (!DEBUG_NAV) return;
 			console.log("[nav_hideShow]", ...args);
 		};
@@ -764,6 +765,10 @@ function main() {
 		});
 	}
 
+	function lazyLoadVideos() {
+		ll = new LazyLoad({});
+	}
+
 	astet.hasImagesLoaded = typeof window.imagesLoaded === "function";
 	clickToCopy();
 	homeCarousel();
@@ -771,4 +776,5 @@ function main() {
 	finsweetScrollTriggerRefresh();
 	nav_openClose();
 	nav_hideShow();
+	lazyLoadVideos();
 }
