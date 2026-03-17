@@ -87,7 +87,7 @@ function main() {
 				if (withinAnchor && triggerEl.contains(withinAnchor)) return withinAnchor;
 			}
 			if (triggerEl.matches?.("a[href]")) return triggerEl;
-			return triggerEl.querySelector?.("a[href]") ?? null;
+			return null;
 		}
 
 		function ensureFeedbackUI(link) {
