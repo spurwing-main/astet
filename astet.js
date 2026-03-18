@@ -410,6 +410,80 @@ function main() {
 		]);
 	}
 
+	function injectExternalLinkIcons() {
+		const containers = document.querySelectorAll(".proj-intro_details");
+		if (!containers.length) return;
+
+		const SVG_NS = "http://www.w3.org/2000/svg";
+
+		function isExternalLink(anchor) {
+			if (!anchor) return false;
+			const hrefAttr = anchor.getAttribute("href");
+			if (!hrefAttr) return false;
+
+			const href = hrefAttr.trim();
+			if (!href) return false;
+			if (
+				href.startsWith("#") ||
+				href.startsWith("mailto:") ||
+				href.startsWith("tel:") ||
+				href.startsWith("sms:") ||
+				href.startsWith("javascript:")
+			)
+				return false;
+
+			try {
+				const url = new URL(href, window.location.href);
+				if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+				return url.origin !== window.location.origin;
+			} catch {
+				return false;
+			}
+		}
+
+		function buildIcon() {
+			const iconWrap = document.createElement("span");
+			iconWrap.className = "u-ext-link-icon";
+			iconWrap.setAttribute("aria-hidden", "true");
+			iconWrap.dataset.extLinkIcon = "1";
+			iconWrap.style.display = "inline-flex";
+			iconWrap.style.marginLeft = "0.35em";
+			iconWrap.style.lineHeight = "1";
+
+			const svg = document.createElementNS(SVG_NS, "svg");
+			svg.setAttribute("width", "10");
+			svg.setAttribute("height", "10");
+			svg.setAttribute("viewBox", "0 0 10 10");
+			svg.setAttribute("fill", "none");
+			svg.setAttribute("xmlns", SVG_NS);
+
+			const path = document.createElementNS(SVG_NS, "path");
+			path.setAttribute(
+				"d",
+				"M7.62733 1.52654C6.98463 1.47 6.17226 1.26955 5.19022 0.925169L5.74551 0.370053C7.16973 0.488272 8.43456 0.364913 9.53999 -2.36877e-05L9.81764 0.277534C9.45259 1.38262 9.32919 2.64705 9.44745 4.07082L8.89216 4.62594C8.54767 3.64421 8.34715 2.83209 8.29059 2.1896L0.663067 9.81472L-0.000196171 9.15167L7.62733 1.52654Z",
+			);
+			path.setAttribute("fill", "currentColor");
+
+			svg.appendChild(path);
+			iconWrap.appendChild(svg);
+			return iconWrap;
+		}
+
+		containers.forEach((container) => {
+			const links = container.querySelectorAll("a[href]");
+			links.forEach((link) => {
+				if (!isExternalLink(link)) return;
+
+				const nextEl = link.nextElementSibling;
+				if (nextEl?.dataset?.extLinkIcon === "1") return;
+				if (link.dataset.extLinkIconInjected === "1") return;
+
+				link.insertAdjacentElement("afterend", buildIcon());
+				link.dataset.extLinkIconInjected = "1";
+			});
+		});
+	}
+
 	function nav_openClose() {
 		const MOBILE_PORTRAIT_QUERY = "(max-width: 479px)";
 
@@ -774,6 +848,7 @@ function main() {
 	homeCarousel();
 	loadCardsOnScroll();
 	finsweetScrollTriggerRefresh();
+	injectExternalLinkIcons();
 	nav_openClose();
 	nav_hideShow();
 	lazyLoadVideos();
