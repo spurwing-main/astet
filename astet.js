@@ -229,6 +229,8 @@ function main() {
 		let started = false;
 		let activeNameIndex = null;
 		let pendingNameIndex = null;
+		let isDraggingCarousel = false;
+		let syncNameAfterDrag = false;
 
 		function startCarousel() {
 			if (started) return;
@@ -286,8 +288,22 @@ function main() {
 							updateNameWithFade(s); // set initial name
 							setCarouselReady("keen-created");
 						},
+						dragStarted: () => {
+							isDraggingCarousel = true;
+							syncNameAfterDrag = false;
+						},
+						dragEnded: () => {
+							isDraggingCarousel = false;
+							syncNameAfterDrag = true;
+						},
+						animationEnded: (s) => {
+							if (!syncNameAfterDrag) return;
+							syncNameAfterDrag = false;
+							updateNameWithFade(s);
+						},
 
 						slideChanged: (s) => {
+							if (isDraggingCarousel) return;
 							updateNameWithFade(s); // update after next/prev (and drag) actually changes slide
 						},
 					},
