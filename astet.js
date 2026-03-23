@@ -227,6 +227,7 @@ function main() {
 		}
 
 		let started = false;
+		let activeNameIndex = null;
 
 		function startCarousel() {
 			if (started) return;
@@ -281,12 +282,12 @@ function main() {
 						},
 						created: (s) => {
 							initControls(s);
-							updateName(s); // set initial name
+							updateNameWithFade(s); // set initial name
 							setCarouselReady("keen-created");
 						},
 
 						slideChanged: (s) => {
-							updateName(s); // update after next/prev (and drag) actually changes slide
+							updateNameWithFade(s); // update after next/prev (and drag) actually changes slide
 						},
 					},
 					[],
@@ -329,6 +330,110 @@ function main() {
 				text: { value: newName, delimiter: "", speed: 2.5 },
 			});
 		}
+
+		function updateNameWithFade(s) {
+			const nameListWrap = document.querySelector(".home-carousel_name-list-wrap");
+			const nameList = document.querySelector(".home-carousel_name-list");
+			if (!nameListWrap || !nameList) return;
+
+			const wraps = Array.from(nameList.querySelectorAll(".home-carousel_name-wrap"));
+			if (!wraps.length) return;
+
+			const rel = s.track.details.rel;
+			const incoming = wraps[rel];
+			if (!incoming) return;
+
+			const currentIndex = activeNameIndex ?? 0;
+			const outgoing = wraps[currentIndex] || wraps[0];
+
+			const showWrapAtIndex = (activeIdx) => {
+				wraps.forEach((wrap, idx) => {
+					const isActive = idx === activeIdx;
+					wrap.classList.remove("is-active");
+					wrap.setAttribute("aria-hidden", String(!isActive));
+					gsap.set(wrap, {
+						clearProps: "position,left,top,xPercent,width,visibility",
+						display: isActive ? "block" : "none",
+						autoAlpha: 1,
+					});
+				});
+				activeNameIndex = activeIdx;
+			};
+
+			const measureWidth = (wrap) => {
+				const previousStyle = wrap.getAttribute("style");
+				gsap.set(wrap, {
+					display: "block",
+					position: "absolute",
+					visibility: "hidden",
+					left: "50%",
+					xPercent: -50,
+					top: 0,
+					autoAlpha: 1,
+				});
+				const width = wrap.offsetWidth;
+				if (previousStyle === null) wrap.removeAttribute("style");
+				else wrap.setAttribute("style", previousStyle);
+				return width;
+			};
+
+			if (!nameList.dataset.homeCarouselNameReady) {
+				showWrapAtIndex(rel);
+				nameList.dataset.homeCarouselNameReady = "1";
+				return;
+			}
+
+			if (incoming === outgoing) {
+				showWrapAtIndex(rel);
+				return;
+			}
+
+			if (nameListWrap._homeCarouselNameTimeline) {
+				nameListWrap._homeCarouselNameTimeline.kill();
+				nameListWrap._homeCarouselNameTimeline = null;
+				if (activeNameIndex !== null) showWrapAtIndex(activeNameIndex);
+			}
+
+			gsap.killTweensOf([nameListWrap, nameList, ...wraps]);
+
+			const currentWidth = outgoing ? outgoing.offsetWidth : nameListWrap.offsetWidth;
+			const incomingWidth = measureWidth(incoming);
+
+			showWrapAtIndex(currentIndex);
+			gsap.set(nameListWrap, { width: currentWidth });
+			gsap.set(nameList, {
+				position: "relative",
+				height: Math.max(outgoing.offsetHeight, incoming.offsetHeight),
+			});
+			gsap.set([outgoing, incoming], {
+				display: "block",
+				position: "absolute",
+				left: "50%",
+				xPercent: -50,
+				top: 0,
+				width: "max-content",
+			});
+			gsap.set(outgoing, { autoAlpha: 1 });
+			gsap.set(incoming, { autoAlpha: 0 });
+
+			const tl = gsap.timeline({
+				defaults: { duration: 0.45, ease: "power1.inOut" },
+				onComplete: () => {
+					showWrapAtIndex(rel);
+					gsap.set(nameListWrap, { clearProps: "width" });
+					gsap.set(nameList, { clearProps: "position,height" });
+					nameListWrap._homeCarouselNameTimeline = null;
+				},
+			});
+			nameListWrap._homeCarouselNameTimeline = tl;
+			tl.to(incoming, { autoAlpha: 1 });
+			tl.to(outgoing, { autoAlpha: 0 }, 0);
+			tl.to(nameListWrap, { width: incomingWidth }, 0);
+		}
+
+		// remove .css-home-carousel-temp element if exists
+		const tempEl = document.querySelector(".css-home-carousel-temp");
+		if (tempEl) tempEl.parentElement.removeChild(tempEl);
 	}
 
 	function loadCardsOnScroll() {
