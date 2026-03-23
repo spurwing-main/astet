@@ -228,9 +228,9 @@ function main() {
 
 		let started = false;
 		let activeNameIndex = null;
-		let pendingNameIndex = null;
+		let desiredNameIndex = null;
 		let isDraggingCarousel = false;
-		let syncNameAfterDrag = false;
+		let shouldFlushNameAfterSliderSettle = false;
 
 		function startCarousel() {
 			if (started) return;
@@ -290,15 +290,16 @@ function main() {
 						},
 						dragStarted: () => {
 							isDraggingCarousel = true;
-							syncNameAfterDrag = false;
+							shouldFlushNameAfterSliderSettle = false;
 						},
-						dragEnded: () => {
+						dragEnded: (s) => {
 							isDraggingCarousel = false;
-							syncNameAfterDrag = true;
+							desiredNameIndex = s.track.details.rel;
+							shouldFlushNameAfterSliderSettle = true;
 						},
 						animationEnded: (s) => {
-							if (!syncNameAfterDrag) return;
-							syncNameAfterDrag = false;
+							if (!shouldFlushNameAfterSliderSettle) return;
+							shouldFlushNameAfterSliderSettle = false;
 							updateNameWithFade(s);
 						},
 
@@ -370,6 +371,12 @@ function main() {
 				activeNameIndex = activeIdx;
 			};
 
+			const flushDesiredNameIndex = () => {
+				if (desiredNameIndex === null || desiredNameIndex === activeNameIndex) return;
+				if (nameListWrap._homeCarouselNameTimeline) return;
+				runTransition(desiredNameIndex);
+			};
+
 			const runTransition = (targetIndex) => {
 				const incoming = wraps[targetIndex];
 				if (!incoming) return;
@@ -396,7 +403,7 @@ function main() {
 
 				if (incoming === outgoing) {
 					showWrapAtIndex(targetIndex);
-					pendingNameIndex = null;
+					flushDesiredNameIndex();
 					return;
 				}
 
@@ -429,15 +436,7 @@ function main() {
 						gsap.set(nameListWrap, { clearProps: "width" });
 						gsap.set(nameList, { clearProps: "position,height" });
 						nameListWrap._homeCarouselNameTimeline = null;
-
-						if (pendingNameIndex !== null && pendingNameIndex !== activeNameIndex) {
-							const queuedIndex = pendingNameIndex;
-							pendingNameIndex = null;
-							runTransition(queuedIndex);
-							return;
-						}
-
-						pendingNameIndex = null;
+						flushDesiredNameIndex();
 					},
 				});
 				nameListWrap._homeCarouselNameTimeline = tl;
@@ -449,27 +448,24 @@ function main() {
 			const rel = s.track.details.rel;
 			const incoming = wraps[rel];
 			if (!incoming) return;
+			desiredNameIndex = rel;
 
 			if (!nameList.dataset.homeCarouselNameReady) {
 				showWrapAtIndex(rel);
 				nameList.dataset.homeCarouselNameReady = "1";
-				pendingNameIndex = null;
 				return;
 			}
 
 			if (rel === activeNameIndex) {
-				pendingNameIndex = null;
 				showWrapAtIndex(rel);
 				return;
 			}
 
 			if (nameListWrap._homeCarouselNameTimeline) {
-				pendingNameIndex = rel;
 				return;
 			}
 
-			pendingNameIndex = null;
-			runTransition(rel);
+			flushDesiredNameIndex();
 		}
 
 		// remove .css-home-carousel-temp element if exists
