@@ -750,7 +750,7 @@ function main() {
 	}
 
 	function nav_hideShow() {
-		const nav = document.querySelector(".nav");
+		const nav = document.querySelector(".nav:not(.is-home-bar)");
 		if (!nav) return;
 		if (typeof window.ScrollTrigger === "undefined" || typeof ScrollTrigger.create !== "function")
 			return;
@@ -764,7 +764,7 @@ function main() {
 			}
 		})();
 		const log = (...args) => {
-			return; // disable all nav_hideShow logs (keep the function and calls in place for easy re-enabling when needed)
+			// disable all nav_hideShow logs (keep the function and calls in place for easy re-enabling when needed)
 			if (!DEBUG_NAV) return;
 			console.log("[nav_hideShow]", ...args);
 		};
