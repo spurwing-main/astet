@@ -474,6 +474,23 @@ function main() {
 	}
 
 	function loadCardsOnScroll() {
+		const DEFAULT_STAGGER = 0.15;
+		const SMALL_STAGGER = 0.05;
+
+		function getStagger(triggerEl) {
+			return triggerEl?.dataset?.animStagger === "small" ? SMALL_STAGGER : DEFAULT_STAGGER;
+		}
+
+		function animateCards(cards, stagger) {
+			gsap.to(cards, {
+				autoAlpha: 1,
+				y: 0,
+				duration: 0.5,
+				ease: "sine.inOut",
+				stagger,
+			});
+		}
+
 		// for each .c-cols-section, create a scrolltrigger that fades in each .c-card inside it with a stagger
 		const sections = document.querySelectorAll(".anim-load-trigger");
 		sections.forEach((section) => {
@@ -489,7 +506,7 @@ function main() {
 				y: 0,
 				duration: 0.5,
 				ease: "sine.inOut",
-				stagger: 0.15,
+				stagger: getStagger(section),
 				onComplete: () => {
 					console.log("Loaded cards in section:", section);
 				},
@@ -497,11 +514,21 @@ function main() {
 		});
 
 		// batch
-		ScrollTrigger.batch(".anim-load-batch-trigger :is(.c-card, .anim-load-item)", {
-			onEnter: (batch) =>
-				gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.5, ease: "sine.inOut", stagger: 0.15 }),
-			start: "top 95%",
-		});
+		ScrollTrigger.batch(
+			".anim-load-batch-trigger[data-anim-stagger='small'] :is(.c-card, .anim-load-item)",
+			{
+				onEnter: (batch) => animateCards(batch, SMALL_STAGGER),
+				start: "top 95%",
+			},
+		);
+
+		ScrollTrigger.batch(
+			".anim-load-batch-trigger:not([data-anim-stagger='small']) :is(.c-card, .anim-load-item)",
+			{
+				onEnter: (batch) => animateCards(batch, DEFAULT_STAGGER),
+				start: "top 95%",
+			},
+		);
 
 		// click events on any filter controls will immediately set autoAlpha and y to 1 and 0 respectively, to ensure they are visible if user filters before scroll
 		// filter controls are .checkbox_label
