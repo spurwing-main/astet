@@ -695,6 +695,7 @@ function main() {
 				navBtns.forEach((navBtn) => navBtn.setAttribute("aria-expanded", String(open)));
 
 				if (open) {
+					navEl.classList.remove("is-hidden");
 					menuWrap.style.display = "flex";
 					tl.play();
 				} else {
@@ -900,6 +901,19 @@ function main() {
 			const delta = yRaw - lastScrollY;
 			const y = isInPageVariant ? yRaw - armStartY : yRaw;
 			const isPast = hideEnabled && y > hideThreshold;
+			const isMenuOpen = Boolean(astet.navOpen);
+
+			if (isMenuOpen) {
+				if (navHidden || nav.classList.contains("is-hidden")) {
+					log("forced show (menu open)", { y });
+					nav.classList.remove("is-hidden");
+					navHidden = false;
+				}
+				nav.classList.toggle("is-past-threshold", isPast);
+				revealDistance = 0;
+				lastScrollY = yRaw;
+				return;
+			}
 
 			if (!hideEnabled) {
 				// While the hero is still on-screen (in-page variant), keep nav in its static/sticky state.
